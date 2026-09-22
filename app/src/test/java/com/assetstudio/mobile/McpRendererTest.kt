@@ -26,99 +26,99 @@ import kotlin.test.assertTrue
 
 class McpRendererTest {
 
-    private val helper = SkinnedMeshRendererPreviewTest()
-    private lateinit var source: AppMcpSource
-    private lateinit var exportDir: File
+	private val helper = SkinnedMeshRendererPreviewTest()
+	private lateinit var source: AppMcpSource
+	private lateinit var exportDir: File
 
-    @BeforeTest
-    fun setUp() {
-        val mgr = helper.buildSmrAssetsManager()
-        exportDir = Files.createTempDirectory("mcp_smr_export").toFile()
-        source = AppMcpSource(mgr, exportDir)
-    }
+	@BeforeTest
+	fun setUp() {
+		val mgr = helper.buildSmrAssetsManager()
+		exportDir = Files.createTempDirectory("mcp_smr_export").toFile()
+		source = AppMcpSource(mgr, exportDir)
+	}
 
-    @AfterTest
-    fun tearDown() {
-        exportDir.deleteRecursively()
-    }
+	@AfterTest
+	fun tearDown() {
+		exportDir.deleteRecursively()
+	}
 
-    @Test
-    fun `列表可按SkinnedMeshRenderer类型过滤`() {
-        val page = source.listAssets("SkinnedMeshRenderer", null, 0, 50)
-        assertEquals(1, page.total, "场景中恰有 1 个 SkinnedMeshRenderer")
-        assertEquals("SkinnedMeshRenderer", page.items[0].type)
-        assertEquals(2L, page.items[0].pathId, "pathID=2（Mesh=1, SMR=2）")
+	@Test
+	fun `列表可按SkinnedMeshRenderer类型过滤`() {
+		val page = source.listAssets("SkinnedMeshRenderer", null, 0, 50)
+		assertEquals(1, page.total, "场景中恰有 1 个 SkinnedMeshRenderer")
+		assertEquals("SkinnedMeshRenderer", page.items[0].type)
+		assertEquals(2L, page.items[0].pathId, "pathID=2（Mesh=1, SMR=2）")
 
-        // 全量列表应包含 Mesh 与 SMR 两类
-        val all = source.listAssets(null, null, 0, 50)
-        assertEquals(2, all.total)
-        assertTrue(all.items.any { it.type == "Mesh" }, "应含 Mesh")
-        assertTrue(all.items.any { it.type == "SkinnedMeshRenderer" }, "应含 SkinnedMeshRenderer")
-    }
+		// 全量列表应包含 Mesh 与 SMR 两类
+		val all = source.listAssets(null, null, 0, 50)
+		assertEquals(2, all.total)
+		assertTrue(all.items.any { it.type == "Mesh" }, "应含 Mesh")
+		assertTrue(all.items.any { it.type == "SkinnedMeshRenderer" }, "应含 SkinnedMeshRenderer")
+	}
 
-    @Test
-    fun `详情返回骨骼材质与引用网格统计`() {
-        val detail = source.assetDetail(2L, null)
-        assertNotNull(detail, "pathID=2 应存在")
-        assertEquals("SkinnedMeshRenderer", detail["type"])
+	@Test
+	fun `详情返回骨骼材质与引用网格统计`() {
+		val detail = source.assetDetail(2L, null)
+		assertNotNull(detail, "pathID=2 应存在")
+		assertEquals("SkinnedMeshRenderer", detail["type"])
 
-        // 渲染器专属字段
-        assertEquals(3, detail["boneCount"], "骨骼数量")
-        assertEquals(1, detail["materialCount"], "材质槽位")
-        assertEquals(0, detail["blendShapeWeightCount"], "混合形状权重（空数组）")
+		// 渲染器专属字段
+		assertEquals(3, detail["boneCount"], "骨骼数量")
+		assertEquals(1, detail["materialCount"], "材质槽位")
+		assertEquals(0, detail["blendShapeWeightCount"], "混合形状权重（空数组）")
 
-        // 原始 PPtr（跨文件引用定位用）
-        @Suppress("UNCHECKED_CAST")
-        val meshRef = detail["meshRef"] as Map<String, Any?>
-        assertEquals(0, meshRef["fileId"], "同文件引用 fileId=0")
-        assertEquals(1L, meshRef["pathId"])
+		// 原始 PPtr（跨文件引用定位用）
+		@Suppress("UNCHECKED_CAST")
+		val meshRef = detail["meshRef"] as Map<String, Any?>
+		assertEquals(0, meshRef["fileId"], "同文件引用 fileId=0")
+		assertEquals(1L, meshRef["pathId"])
 
-        // 解引用后的网格统计
-        @Suppress("UNCHECKED_CAST")
-        val ref = detail["referencedMesh"] as Map<String, Any?>
-        assertEquals(1L, ref["pathId"], "引用 pathID=1 的 Mesh")
-        assertEquals("SkinQuad", ref["name"])
-        assertEquals(4, ref["vertexCount"])
-        assertEquals(1, ref["subMeshCount"])
-        assertEquals(2, ref["triangleCount"])
-    }
+		// 解引用后的网格统计
+		@Suppress("UNCHECKED_CAST")
+		val ref = detail["referencedMesh"] as Map<String, Any?>
+		assertEquals(1L, ref["pathId"], "引用 pathID=1 的 Mesh")
+		assertEquals("SkinQuad", ref["name"])
+		assertEquals(4, ref["vertexCount"])
+		assertEquals(1, ref["subMeshCount"])
+		assertEquals(2, ref["triangleCount"])
+	}
 
-    @Test
-    fun `转储渲染器为可读文本`() {
-        val text = source.renderDump(2L, null)
-        assertNotNull(text, "pathID=2 应可转储")
+	@Test
+	fun `转储渲染器为可读文本`() {
+		val text = source.renderDump(2L, null)
+		assertNotNull(text, "pathID=2 应可转储")
 
-        assertTrue(text.contains("SkinnedMeshRenderer:"), "转储标题")
-        // 网格引用段：解析出网格名与统计
-        assertTrue(text.contains("--- 网格引用 ---"), "网格引用段")
-        assertTrue(text.contains("「SkinQuad」"), "网格引用应解析出网格名")
-        assertTrue(text.contains("顶点"), "网格统计")
-        // 骨骼/材质槽段
-        assertTrue(text.contains("--- 骨骼 (3) ---"), "骨骼段：3 根骨骼")
-        assertTrue(text.contains("--- 材质槽 (1) ---"), "材质槽段：1 个槽位")
-        // 混合形状权重段
-        assertTrue(text.contains("--- 混合形状权重 (0) ---"), "混合形状权重段：空数组")
-    }
+		assertTrue(text.contains("SkinnedMeshRenderer:"), "转储标题")
+		// 网格引用段：解析出网格名与统计
+		assertTrue(text.contains("--- 网格引用 ---"), "网格引用段")
+		assertTrue(text.contains("「SkinQuad」"), "网格引用应解析出网格名")
+		assertTrue(text.contains("顶点"), "网格统计")
+		// 骨骼/材质槽段
+		assertTrue(text.contains("--- 骨骼 (3) ---"), "骨骼段：3 根骨骼")
+		assertTrue(text.contains("--- 材质槽 (1) ---"), "材质槽段：1 个槽位")
+		// 混合形状权重段
+		assertTrue(text.contains("--- 混合形状权重 (0) ---"), "混合形状权重段：空数组")
+	}
 
-    @Test
-    fun `导出OBJ走渲染器引用的网格`() {
-        val path = source.exportAsset(2L, null, "obj")
-        assertTrue(path.endsWith(".obj"), "导出文件应为 .obj：$path")
+	@Test
+	fun `导出OBJ走渲染器引用的网格`() {
+		val path = source.exportAsset(2L, null, "obj")
+		assertTrue(path.endsWith(".obj"), "导出文件应为 .obj：$path")
 
-        val text = File(path).readText(Charsets.UTF_8)
-        assertTrue(text.contains("o SkinQuad"), "OBJ 对象名来自引用的 Mesh")
-        assertTrue(text.contains("v "), "含顶点行")
-        assertTrue(text.contains("f "), "含面行")
-    }
+		val text = File(path).readText(Charsets.UTF_8)
+		assertTrue(text.contains("o SkinQuad"), "OBJ 对象名来自引用的 Mesh")
+		assertTrue(text.contains("v "), "含顶点行")
+		assertTrue(text.contains("f "), "含面行")
+	}
 
-    @Test
-    fun `导出渲染器转储文本`() {
-        val path = source.exportAsset(2L, null, "txt")
-        assertTrue(path.endsWith(".txt"), "导出文件应为 .txt：$path")
+	@Test
+	fun `导出渲染器转储文本`() {
+		val path = source.exportAsset(2L, null, "txt")
+		assertTrue(path.endsWith(".txt"), "导出文件应为 .txt：$path")
 
-        val text = File(path).readText(Charsets.UTF_8)
-        assertTrue(text.contains("SkinnedMeshRenderer:"), "转储标题")
-        assertTrue(text.contains("「SkinQuad」"), "网格引用解析")
-        assertTrue(text.contains("--- 骨骼 (3) ---"), "骨骼段")
-    }
+		val text = File(path).readText(Charsets.UTF_8)
+		assertTrue(text.contains("SkinnedMeshRenderer:"), "转储标题")
+		assertTrue(text.contains("「SkinQuad」"), "网格引用解析")
+		assertTrue(text.contains("--- 骨骼 (3) ---"), "骨骼段")
+	}
 }
