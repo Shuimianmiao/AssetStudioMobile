@@ -32,7 +32,7 @@ jobs:
         java-version: '17'
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v5
       with:
         cache-read-only: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
       continue-on-error: true
@@ -48,14 +48,14 @@ jobs:
       continue-on-error: true
 
     - name: Upload Debug APK
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/*.apk
         if-no-files-found: warn
 
     - name: Upload Release APK
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: app-release-unsigned
